@@ -1,37 +1,42 @@
-node {
-    def app
-
-    stage('Clone repository') {
-        /* Let's make sure we have the repository cloned to our workspace */
-
-        checkout scm
+pipeline {  
+  agent {
+    node {
+      label 'maven'
     }
-
-    stage('Build image') {
-        /* This builds the actual image; synonymous to
-         * docker build on the command line */
-
-        app = docker.build("virtapp/hellonode")
-    }
-
-    stage('Test image') {
-        /* Ideally, we would run a test framework against our image.
-         * For this example, we're using a Volkswagen-type approach ;-) */
-
-        app.inside {
-            sh 'echo "Tests passed"'
+  }
+     
+  environment {
+    // the address of your harbor registry
+    REGISTRY = '103.61.38.55:30002'
+    // the project name
+    // make sure your robot account have enough access to the project
+    HARBOR_NAMESPACE = 'ks-devops-harbor'
+    // docker image name
+    APP_NAME = 'docker-example'
+    // ‘robot-test’ is the credential ID you created on the KubeSphere console
+    HARBOR_CREDENTIAL = credentials('robot-test')
+  }
+     
+  stages {
+    stage('docker login') {
+      steps{
+        container ('maven') {
+          // replace the Docker Hub username behind -u and do not forget ''. You can also use a Docker Hub token. 
+          sh '''echo $HARBOR_CREDENTIAL_PSW | docker login $REGISTRY -u 'robot$robot-test' --password-stdin'''
+            }
+          }  
         }
-    }
-
-    stage('Push image') {
-        /* Finally, we'll push the image with two tags:
-         * First, the incremental build number from Jenkins
-         * Second, the 'latest' tag.
-         * Pushing multiple tags is cheap, as all the layers are reused. */
-        docker.withRegistry('https://registry.hub.docker.com', 'docker-hub-credentials') {
-            app.push("${env.BUILD_NUMBER}")
-            app.push("latest")
+           
+    stage('build & push') {
+      steps {
+        container ('maven') {
+          sh 'git clone https://github.com/kstaken/dockerfile-examples.git'
+          sh 'cd dockerfile-examples/rethinkdb && docker build -t $REGISTRY/$HARBOR_NAMESPACE/$APP_NAME:devops-test .'
+          sh 'docker push  $REGISTRY/$HARBOR_NAMESPACE/$APP_NAME:devops-test'
+          }
         }
+      }
     }
-}
-
+  }
+   
+   
