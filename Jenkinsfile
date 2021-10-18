@@ -6,40 +6,31 @@ node {
 
         checkout scm
     }
-  }
-     
-  environment {
-    // the address of your harbor registry
-    REGISTRY = 'https://global-registry.artlist.me/library'
-    // the project name
-    // make sure your robot account have enough access to the project
-    HARBOR_NAMESPACE = 'library'
-    // docker image name
-    APP_NAME = 'tools'
-    // ‘robot-test’ is the credential ID you created on the KubeSphere console
-    HARBOR_CREDENTIAL = credentials('harbor-registry')
-  }
-     
-  stages {
-    stage('docker login') {
-      steps{
-        container ('maven') {
-          // replace the Docker Hub username behind -u and do not forget ''. You can also use a Docker Hub token. 
-          sh '''echo $HARBOR_CREDENTIAL_PSW | docker login $REGISTRY -u 'admin$harbor-registry' --password-stdin'''
-            }
-          }  
-        }
-           
-    stage('build & push') {
-      steps {
-        container ('maven') {
-          sh 'git clone https://github.com/virtapp/test2.git'
-          sh 'cd test2 && docker build -t $REGISTRY/$HARBOR_NAMESPACE/$APP_NAME:0.1 .'
-          sh 'docker push  $REGISTRY/$HARBOR_NAMESPACE/$APP_NAME:0.1'
-          }
-        }
-      }
+
+    stage('Build image') {
+        /* This builds the actual image; synonymous to
+         * docker build on the command line */
+
+        app = docker.build("library/hellonode")
     }
-  }
-   
-   
+
+    stage('Test image') {
+        /* Ideally, we would run a test framework against our image.
+         * For this example, we're using a Volkswagen-type approach ;-) */
+
+        app.inside {
+            sh 'echo "Tests passed"'
+        }
+    }
+
+    stage('Push image') {
+        /* Finally, we'll push the image with two tags:
+         * First, the incremental build number from Jenkins
+         * Second, the 'latest' tag.
+         * Pushing multiple tags is cheap, as all the layers are reused. */
+        docker.withRegistry('https://global-registry.artlist.me', 'docker-hub-credentials') {
+            app.push("${env.BUILD_NUMBER}")
+            app.push("latest")
+        }
+    }
+}
