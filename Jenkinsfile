@@ -7,7 +7,7 @@ pipeline {
      
   environment {
     // the address of your harbor registry
-    REGISTRY = '103.61.38.55:30002'
+    REGISTRY = 'https://global-registry.artlist.me/library'
     // the project name
     // make sure your robot account have enough access to the project
     HARBOR_NAMESPACE = 'ks-devops-harbor'
